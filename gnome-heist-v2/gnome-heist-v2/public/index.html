@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🩲 Gnome Underpants Heist</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@400;600&family=Lora:ital@0;1&display=swap');
+
+:root {
+  --gold:  #f0c040;
+  --cream: #f5e6c8;
+  --dark:  #120d06;
+  --bark:  #5c3d1e;
+  --moss:  #3d6b35;
+  --panel: #1a1208;
+  --border:#3a2a10;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--dark);color:var(--cream);font-family:'Lora',serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background-image:radial-gradient(ellipse at 20% 50%,#2d1a4418 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,#1a3a1a18 0%,transparent 60%);}
+
+/* ── SCREENS ── */
+.screen{display:none;flex-direction:column;align-items:center;gap:18px;width:100%;max-width:480px;padding:20px;}
+.screen.active{display:flex;}
+
+.logo{font-family:'Cinzel Decorative',serif;font-size:clamp(1.4rem,4vw,2.2rem);color:var(--gold);text-shadow:0 0 30px #f0a02066,0 2px 0 #000;text-align:center;line-height:1.3;}
+.tagline{font-style:italic;color:#9a8060;font-size:0.82rem;text-align:center;}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:20px 24px;width:100%;display:flex;flex-direction:column;gap:12px;}
+.card h3{font-family:'Cinzel',serif;color:var(--gold);font-size:0.9rem;letter-spacing:0.08em;}
+
+input[type=text]{background:#0d0a06;border:1px solid var(--border);color:var(--cream);font-family:'Lora',serif;font-size:1rem;padding:9px 13px;border-radius:4px;width:100%;outline:none;transition:border-color 0.2s;}
+input[type=text]:focus{border-color:var(--gold);}
+input[type=text]::placeholder{color:#5a4a30;}
+input[type=text].code-input{font-family:'Cinzel',serif;font-size:1.4rem;letter-spacing:0.3em;text-align:center;text-transform:uppercase;}
+
+.btn{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.08em;cursor:pointer;border-radius:4px;padding:10px 22px;transition:all 0.15s;border:none;}
+.btn-gold{background:linear-gradient(135deg,#6a3a10,#a05820);border:2px solid var(--gold);color:#f0e0a0;box-shadow:0 0 12px #f0a02044;}
+.btn-gold:hover{background:linear-gradient(135deg,#8a5020,#c07830);box-shadow:0 0 24px #f0a020aa;transform:translateY(-1px);}
+.btn-outline{background:transparent;border:1px solid var(--border);color:#a09070;}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold);}
+.btn-red{background:linear-gradient(135deg,#6a1010,#a02020);border:2px solid #e74c3c;color:#f0c0c0;box-shadow:0 0 12px #e74c3c44;}
+.btn-red:hover{background:linear-gradient(135deg,#8a2020,#c03030);box-shadow:0 0 24px #e74c3caa;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;}
+
+.error-msg{color:#e74c3c;font-size:0.8rem;font-style:italic;min-height:1.2em;text-align:center;}
+
+/* ── LOBBY ── */
+#lobby-code-display{font-family:'Cinzel Decorative',serif;font-size:3rem;color:var(--gold);text-shadow:0 0 30px #f0a020;letter-spacing:0.2em;text-align:center;}
+#lobby-code-hint{color:#6a5a30;font-size:0.72rem;text-align:center;font-style:italic;}
+
+.player-list{display:flex;flex-direction:column;gap:6px;width:100%;}
+.player-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0d0a06;border:1px solid var(--border);border-radius:4px;font-size:0.82rem;}
+.player-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.player-row-name{flex:1;font-family:'Cinzel',serif;}
+.host-badge{font-size:0.65rem;background:#3a2a08;border:1px solid var(--gold);color:var(--gold);padding:1px 6px;border-radius:10px;}
+.waiting-badge{font-size:0.65rem;color:#6a5a30;font-style:italic;}
+
+#lobby-status{color:#9a8060;font-style:italic;font-size:0.8rem;text-align:center;}
+
+/* ── GAME AREA ── */
+#game-screen{display:none;flex-direction:column;align-items:center;width:100%;}
+#game-screen.active{display:flex;}
+
+header{padding:10px 0 5px;text-align:center;}
+header h1{font-family:'Cinzel Decorative',serif;font-size:clamp(1rem,2.5vw,1.6rem);color:var(--gold);text-shadow:0 0 20px #f0a02055;}
+
+#canvas-wrap{position:relative;border:2px solid var(--bark);box-shadow:0 0 60px #00000099;}
+canvas{display:block;}
+
+#hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:5px 14px;background:#0d0a06;border-top:2px solid var(--bark);font-family:'Cinzel',serif;font-size:0.78rem;color:var(--gold);gap:8px;flex-wrap:wrap;}
+#timer{font-size:0.95rem;color:var(--cream);min-width:54px;text-align:center;}
+#timer.urgent{color:#e74c3c;animation:blink 0.5s infinite;}
+@keyframes blink{50%{opacity:0.4;}}
+#scoreboard{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.sb-entry{display:flex;align-items:center;gap:4px;background:#1a1208cc;border:1px solid #3a2a1088;border-radius:3px;padding:2px 7px;font-size:0.7rem;}
+.sb-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+#feed{position:absolute;top:8px;right:8px;width:190px;display:flex;flex-direction:column;gap:3px;pointer-events:none;}
+.feed-msg{background:#1a120acc;border-left:3px solid var(--gold);padding:4px 8px;font-size:0.68rem;color:var(--cream);border-radius:0 3px 3px 0;animation:slideIn 0.2s ease,fadeOut 0.5s ease 2.5s forwards;}
+@keyframes slideIn{from{transform:translateX(16px);opacity:0;}}
+@keyframes fadeOut{to{opacity:0;transform:translateX(8px);}}
+
+/* Canvas overlays */
+.c-overlay{position:absolute;inset:0;background:#0d0a06ee;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;}
+.c-overlay h2{font-family:'Cinzel Decorative',serif;color:var(--gold);font-size:clamp(1.2rem,3vw,1.8rem);text-shadow:0 0 20px #f0a020;text-align:center;}
+.c-overlay p{color:#b09070;font-style:italic;font-size:0.85rem;text-align:center;}
+.big-num{font-family:'Cinzel Decorative',serif;font-size:5rem;color:var(--gold);text-shadow:0 0 40px #f0a020;animation:zoomIn 0.4s ease;}
+@keyframes zoomIn{from{transform:scale(2);opacity:0;}}
+
+.leaderboard{display:flex;flex-direction:column;gap:5px;min-width:230px;}
+.lb-row{display:flex;align-items:center;gap:8px;padding:6px 12px;background:#1a1208;border:1px solid #3a2a10;border-radius:3px;font-family:'Cinzel',serif;font-size:0.78rem;}
+.lb-row.first{border-color:var(--gold);background:#2a200a;}
+.lb-rank{color:var(--gold);min-width:20px;}
+.lb-name{flex:1;}
+.lb-score{color:var(--gold);}
+
+/* Controls */
+#controls-bar{padding:4px 0 6px;font-size:0.66rem;color:#5a4a30;letter-spacing:0.05em;text-align:center;}
+#controls-bar span{color:#8a7a50;}
+
+/* Mobile */
+#mobile-controls{display:none;gap:8px;padding:8px;justify-content:center;align-items:center;flex-wrap:wrap;}
+@media(max-width:680px){#mobile-controls{display:flex;}#controls-bar{display:none;}}
+.m-btn{width:52px;height:52px;background:#2a1e08cc;border:2px solid var(--bark);color:var(--cream);font-size:1.3rem;border-radius:8px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:background 0.1s;}
+.m-btn.held,.m-btn:active{background:#5c3d1ecc;}
+.m-btn.steal-btn{border-color:#e74c3c;}
+.m-btn.dash-btn{border-color:#3498db;}
+</style>
+</head>
+<body>
+
+<!-- ── HOME SCREEN ── -->
+<div class="screen active" id="home-screen">
+  <div class="logo">🩲 Gnome Underpants<br>Heist</div>
+  <div class="tagline">Protect your pants. Steal everyone else's.</div>
+
+  <div class="card">
+    <h3>Your Gnome Name</h3>
+    <input type="text" id="player-name" placeholder="Enter your name…" maxlength="16">
+  </div>
+
+  <div class="card">
+    <h3>Create a New Room</h3>
+    <button class="btn btn-gold" onclick="createRoom()">⚒ Create Room</button>
+  </div>
+
+  <div class="card">
+    <h3>Join a Room</h3>
+    <input type="text" class="code-input" id="join-code" placeholder="ABCD" maxlength="4">
+    <button class="btn btn-outline" onclick="joinRoom()">🚪 Join Room</button>
+    <div class="error-msg" id="join-error"></div>
+  </div>
+</div>
+
+<!-- ── LOBBY SCREEN ── -->
+<div class="screen" id="lobby-screen">
+  <div class="logo" style="font-size:1.4rem">🧙 Heist Lobby</div>
+
+  <div style="text-align:center">
+    <div style="color:#9a8060;font-size:0.75rem;margin-bottom:4px;font-style:italic">Room Code</div>
+    <div id="lobby-code-display">----</div>
+    <div id="lobby-code-hint">Share this code with your friends!</div>
+  </div>
+
+  <div class="card" style="gap:8px">
+    <h3>Players (<span id="lobby-count">1</span>/8)</h3>
+    <div class="player-list" id="player-list"></div>
+  </div>
+
+  <div id="lobby-status">Waiting for the host to start…</div>
+  <button class="btn btn-gold" id="start-btn" style="display:none" onclick="startGame()">▶ Start Heist!</button>
+  <button class="btn btn-outline" onclick="leaveRoom()" style="font-size:0.75rem;padding:6px 16px">Leave Room</button>
+</div>
+
+<!-- ── GAME SCREEN ── -->
+<div id="game-screen">
+  <header><h1>🩲 Gnome Underpants Heist</h1></header>
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="feed"></div>
+
+    <!-- countdown -->
+    <div class="c-overlay" id="countdown-overlay" style="display:none">
+      <h2>Heist starting in…</h2>
+      <div class="big-num" id="countdown-num">3</div>
+    </div>
+
+    <!-- round end -->
+    <div class="c-overlay" id="end-overlay" style="display:none">
+      <h2>🏆 Round Over!</h2>
+      <div class="leaderboard" id="leaderboard"></div>
+      <p>Returning to lobby…</p>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="hud-my-pants" style="display:flex;align-items:center;gap:6px">
+      <span style="color:#9a8060">Your pants:</span>
+      <span id="my-pants-icons"></span>
+    </div>
+    <div id="timer">--</div>
+    <div id="scoreboard"></div>
+  </div>
+
+  <div id="mobile-controls">
+    <button class="m-btn" id="btn-left">◀</button>
+    <button class="m-btn" id="btn-right">▶</button>
+    <button class="m-btn" id="btn-jump">⬆</button>
+    <button class="m-btn dash-btn" id="btn-dash">💨</button>
+    <button class="m-btn steal-btn" id="btn-steal">🩲</button>
+  </div>
+  <div id="controls-bar">
+    <span>A/D or ←/→</span> Move &nbsp;
+    <span>W/Space/↑</span> Jump &nbsp;
+    <span>Shift</span> Dash &nbsp;
+    <span>E / F</span> Steal 🩲
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+const socket = io();
+let myId = null, myRoomCode = null, isHost = false;
+let gameData = { players:[], timer:90, state:'lobby' };
+let platforms = [], worldW=1200, worldH=700;
+const keys = {}, mobileInput = { left:false,right:false,jump:false,dash:false,steal:false };
+let lastInputStr = '';
+
+// ── Screens ───────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+  const gs = document.getElementById('game-screen');
+  gs.style.display = (id === 'game') ? 'flex' : 'none';
+}
+
+// ── Room actions ──────────────────────────────────────────────
+function getPlayerName() {
+  return document.getElementById('player-name').value.trim() || '';
+}
+
+function createRoom() {
+  socket.emit('create_room', { playerName: getPlayerName() });
+}
+
+function joinRoom() {
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  document.getElementById('join-error').textContent = '';
+  if (code.length !== 4) { document.getElementById('join-error').textContent = 'Enter a 4-letter code.'; return; }
+  socket.emit('join_room', { code, playerName: getPlayerName() });
+}
+
+function startGame() {
+  socket.emit('start_game');
+}
+
+function leaveRoom() {
+  socket.disconnect();
+  location.reload();
+}
+
+// ── Lobby helpers ─────────────────────────────────────────────
+function renderLobby(players, hostId) {
+  document.getElementById('lobby-count').textContent = players.length;
+  const list = document.getElementById('player-list');
+  list.innerHTML = players.map(p => `
+    <div class="player-row">
+      <div class="player-dot" style="background:${p.color}"></div>
+      <span class="player-row-name" style="color:${p.color}">${p.name}</span>
+      ${p.id === hostId ? '<span class="host-badge">HOST</span>' : '<span class="waiting-badge">waiting…</span>'}
+    </div>
+  `).join('');
+
+  const startBtn = document.getElementById('start-btn');
+  const lobbyStatus = document.getElementById('lobby-status');
+  if (isHost) {
+    startBtn.style.display = 'block';
+    startBtn.disabled = players.length < 1;
+    lobbyStatus.textContent = players.length === 1 ? 'You can start solo or wait for friends!' : `${players.length} gnomes ready — start when you like!`;
+  } else {
+    startBtn.style.display = 'none';
+    lobbyStatus.textContent = 'Waiting for the host to start…';
+  }
+}
+
+// ── Socket events ─────────────────────────────────────────────
+socket.on('room_created', (data) => {
+  myId = data.playerId;
+  myRoomCode = data.code;
+  isHost = true;
+  platforms = data.platforms;
+  worldW = data.worldW; worldH = data.worldH;
+  document.getElementById('lobby-code-display').textContent = data.code;
+  renderLobby(data.players, data.hostId);
+  showScreen('lobby');
+});
+
+socket.on('room_joined', (data) => {
+  myId = data.playerId;
+  myRoomCode = data.code;
+  isHost = false;
+  platforms = data.platforms;
+  worldW = data.worldW; worldH = data.worldH;
+  document.getElementById('lobby-code-display').textContent = data.code;
+  renderLobby(data.players, data.hostId);
+  showScreen('lobby');
+});
+
+socket.on('join_error', (data) => {
+  document.getElementById('join-error').textContent = data.message;
+});
+
+socket.on('lobby_update', (data) => {
+  isHost = data.hostId === myId;
+  renderLobby(data.players, data.hostId);
+  if (data.message) addFeedMsg(data.message);
+});
+
+socket.on('back_to_lobby', (data) => {
+  isHost = data.hostId === myId;
+  document.getElementById('end-overlay').style.display = 'none';
+  document.getElementById('lobby-code-display').textContent = myRoomCode;
+  renderLobby(data.players, data.hostId);
+  showScreen('lobby');
+});
+
+socket.on('countdown_start', () => {
+  // Switch to game screen first
+  showScreen('game');
+  resizeCanvas();
+  const ov = document.getElementById('countdown-overlay');
+  const num = document.getElementById('countdown-num');
+  ov.style.display = 'flex';
+  let n = 3; num.textContent = n;
+  const iv = setInterval(() => {
+    n--;
+    if (n <= 0) { clearInterval(iv); ov.style.display = 'none'; return; }
+    num.textContent = n;
+    num.style.animation = 'none'; void num.offsetHeight; num.style.animation = 'zoomIn 0.4s ease';
+  }, 1000);
+});
+
+socket.on('round_start', (data) => {
+  platforms = data.platforms;
+  document.getElementById('end-overlay').style.display = 'none';
+  document.getElementById('countdown-overlay').style.display = 'none';
+});
+
+socket.on('game_tick', (data) => {
+  gameData = data;
+  updateHUD(data);
+});
+
+socket.on('round_end', (data) => {
+  document.getElementById('end-overlay').style.display = 'flex';
+  document.getElementById('leaderboard').innerHTML = data.leaderboard.map((p,i) => `
+    <div class="lb-row ${i===0?'first':''}">
+      <span class="lb-rank">${['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'][i]||i+1}</span>
+      <div class="sb-dot" style="background:${p.color}"></div>
+      <span class="lb-name" style="color:${p.color}">${p.name}</span>
+      <span class="lb-score">🩲×${p.underwear} (stole ${p.stolenTotal})</span>
+    </div>
+  `).join('');
+});
+
+socket.on('steal_event', (d) => addFeedMsg(`<span style="color:${d.thiefColor}">${d.thief}</span> nicked ${d.victim}'s pants! 🩲`));
+
+// ── Canvas / Resize ───────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let renderScale = 1;
+
+function resizeCanvas() {
+  const maxW = Math.min(window.innerWidth - 4, 1000);
+  renderScale = maxW / worldW;
+  canvas.width  = Math.floor(worldW * renderScale);
+  canvas.height = Math.floor(worldH * renderScale);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ── HUD ───────────────────────────────────────────────────────
+function updateHUD(data) {
+  const me = data.players.find(p => p.id === myId);
+  if (me) {
+    document.getElementById('my-pants-icons').innerHTML =
+      Array.from({length:5},(_,i)=>`<span>${i<me.underwear?'🩲':'▫️'}</span>`).join('');
+  }
+  const t = document.getElementById('timer');
+  t.textContent = data.timer + 's';
+  t.className = data.timer <= 15 ? 'urgent' : '';
+
+  const sorted = [...data.players].sort((a,b) => b.underwear - a.underwear);
+  document.getElementById('scoreboard').innerHTML = sorted.map(p =>
+    `<div class="sb-entry"><div class="sb-dot" style="background:${p.color}"></div><span style="color:${p.color}">${p.name}</span><span style="margin-left:4px">🩲${p.underwear}</span></div>`
+  ).join('');
+}
+
+// ── Feed ──────────────────────────────────────────────────────
+function addFeedMsg(html) {
+  const feed = document.getElementById('feed');
+  const el = document.createElement('div');
+  el.className = 'feed-msg'; el.innerHTML = html;
+  feed.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ── Input ─────────────────────────────────────────────────────
+document.addEventListener('keydown', e => { keys[e.code] = true; if(['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault(); });
+document.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+// Mobile buttons
+['left','right','jump','dash','steal'].forEach(action => {
+  const btn = document.getElementById('btn-' + action);
+  if (!btn) return;
+  const on  = e => { e.preventDefault(); mobileInput[action]=true;  btn.classList.add('held'); };
+  const off = e => { e.preventDefault(); mobileInput[action]=false; btn.classList.remove('held'); };
+  btn.addEventListener('touchstart', on,  {passive:false});
+  btn.addEventListener('touchend',   off, {passive:false});
+  btn.addEventListener('mousedown',  on);
+  btn.addEventListener('mouseup',    off);
+});
+
+setInterval(() => {
+  const inp = {
+    left:  !!(keys['ArrowLeft']  || keys['KeyA'] || mobileInput.left),
+    right: !!(keys['ArrowRight'] || keys['KeyD'] || mobileInput.right),
+    jump:  !!(keys['ArrowUp']    || keys['KeyW'] || keys['Space'] || mobileInput.jump),
+    dash:  !!(keys['ShiftLeft']  || keys['ShiftRight'] || mobileInput.dash),
+    steal: !!(keys['KeyE']       || keys['KeyF'] || mobileInput.steal),
+  };
+  const str = JSON.stringify(inp);
+  if (str !== lastInputStr) { socket.emit('input', inp); lastInputStr = str; }
+}, 1000/60);
+
+// ── Renderer ──────────────────────────────────────────────────
+function drawBg() {
+  const s=renderScale, W=worldW*s, H=worldH*s;
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#1a0f35'); sky.addColorStop(0.6,'#2c1a4a'); sky.addColorStop(1,'#1a1408');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,255,220,0.5)';
+  [[50,30],[120,60],[200,20],[320,80],[450,15],[580,55],[700,25],[820,70],[950,40],[1100,20],
+   [80,110],[250,130],[430,90],[600,120],[780,100],[1000,115],[160,170],[390,150],[700,180],[900,160]]
+    .forEach(([x,y])=>ctx.fillRect(x*s,y*s,2*s,2*s));
+  ctx.fillStyle='#1e2a10';
+  ctx.beginPath(); ctx.moveTo(0,H*0.85);
+  ctx.bezierCurveTo(W*0.15,H*0.65,W*0.3,H*0.75,W*0.45,H*0.7);
+  ctx.bezierCurveTo(W*0.6,H*0.65,W*0.75,H*0.8,W,H*0.72);
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath(); ctx.fill();
+  [[60,640],[300,640],[650,640],[1050,640],[170,500],[840,460]].forEach(([mx,my])=>{
+    ctx.fillStyle='#8b2222';
+    ctx.beginPath(); ctx.arc(mx*s,my*s,14*s,Math.PI,0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.fillRect((mx-3)*s,(my-6)*s,6*s,16*s);
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.fillRect((mx-8)*s,(my-4)*s,4*s,4*s); ctx.fillRect((mx+3)*s,(my-8)*s,4*s,4*s);
+  });
+}
+
+function drawPlatforms() {
+  const s=renderScale;
+  for(const pl of platforms){
+    const g=ctx.createLinearGradient(pl.x*s,pl.y*s,pl.x*s,(pl.y+pl.h)*s);
+    g.addColorStop(0,'#5c8a3c'); g.addColorStop(0.4,'#4a7030'); g.addColorStop(1,'#3a5820');
+    ctx.fillStyle=g; ctx.fillRect(pl.x*s,pl.y*s,pl.w*s,pl.h*s);
+    const dg=ctx.createLinearGradient(pl.x*s,(pl.y+pl.h*0.4)*s,pl.x*s,(pl.y+pl.h)*s);
+    dg.addColorStop(0,'#7a4e2d'); dg.addColorStop(1,'#5c3a1e');
+    ctx.fillStyle=dg; ctx.fillRect(pl.x*s,(pl.y+pl.h*0.4)*s,pl.w*s,Math.min(pl.h*0.6,12)*s);
+    ctx.fillStyle='#6aaa3c';
+    for(let gx=pl.x+8;gx<pl.x+pl.w-4;gx+=18){ctx.fillRect(gx*s,(pl.y-3)*s,4*s,4*s);ctx.fillRect((gx+6)*s,(pl.y-5)*s,3*s,6*s);}
+  }
+}
+
+function drawGnome(p) {
+  const s=renderScale, x=p.x*s, y=p.y*s, f=p.facing, isMe=p.id===myId;
+  ctx.save(); ctx.translate(x+16*s, y+20*s); if(f<0)ctx.scale(-1,1);
+  if(p.dashing){
+    ctx.globalAlpha=0.25;
+    for(let i=1;i<=3;i++){ctx.fillStyle=p.color;ctx.fillRect((-16-i*6*f)*s,-20*s,32*s,40*s);}
+    ctx.globalAlpha=1;
+  }
+  // Body
+  ctx.fillStyle=p.color; ctx.fillRect(-12*s,-10*s,24*s,26*s);
+  // Hat
+  ctx.fillStyle=p.color; ctx.beginPath(); ctx.moveTo(-14*s,-10*s); ctx.lineTo(0,-36*s); ctx.lineTo(14*s,-10*s); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.13)'; ctx.beginPath(); ctx.moveTo(-5*s,-10*s); ctx.lineTo(0,-34*s); ctx.lineTo(4*s,-10*s); ctx.closePath(); ctx.fill();
+  // Face
+  ctx.fillStyle='#f5deb3'; ctx.fillRect(-8*s,-8*s,16*s,12*s);
+  // Beard
+  ctx.fillStyle='#ddd'; ctx.fillRect(-8*s,2*s,16*s,10*s);
+  // Eyes
+  ctx.fillStyle='#222'; ctx.fillRect(-5*s,-5*s,3*s,3*s); ctx.fillRect(2*s,-5*s,3*s,3*s);
+  // Legs
+  ctx.fillStyle='#5a3a1a'; ctx.fillRect(-10*s,16*s,8*s,10*s); ctx.fillRect(2*s,16*s,8*s,10*s);
+  // Stacked underwear on head
+  const uwColors=['#ff6b9d','#6bceff','#a8ff6b','#ffdd6b','#c96bff'];
+  for(let i=0;i<p.underwear;i++){
+    ctx.fillStyle=uwColors[i%uwColors.length]; ctx.fillRect((-14+i*2)*s,(-42-i*6)*s,28*s,8*s);
+    ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect((-14+i*2)*s,(-42-i*6)*s,28*s,3*s);
+  }
+  if(isMe){ctx.fillStyle='#fff';ctx.font=`bold ${9*s}px Cinzel,serif`;ctx.textAlign='center';ctx.fillText('YOU',0,(-52-p.underwear*6)*s);}
+  ctx.font=`${8*s}px Lora,serif`; ctx.fillStyle=p.color; ctx.textAlign='center'; ctx.fillText(p.name,0,32*s);
+  ctx.restore();
+}
+
+function drawStealRange() {
+  const me = gameData.players.find(p=>p.id===myId);
+  if(!me) return;
+  const s=renderScale;
+  for(const p of gameData.players){
+    if(p.id===myId||p.underwear<=0)continue;
+    const dx=(me.x+16)-(p.x+16), dy=(me.y+20)-(p.y+20);
+    if(Math.sqrt(dx*dx+dy*dy)<48){
+      ctx.save(); ctx.strokeStyle='#e74c3c'; ctx.lineWidth=2*s; ctx.globalAlpha=0.5+0.3*Math.sin(Date.now()/150);
+      ctx.setLineDash([4*s,4*s]); ctx.beginPath(); ctx.arc((p.x+16)*s,(p.y+20)*s,28*s,0,Math.PI*2); ctx.stroke(); ctx.restore();
+    }
+  }
+}
+
+function render() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawBg(); drawPlatforms(); drawStealRange();
+  for(const p of gameData.players) drawGnome(p);
+  requestAnimationFrame(render);
+}
+render();
+
+// Enter key for join
+document.getElementById('join-code').addEventListener('keydown', e => { if(e.key==='Enter') joinRoom(); });
+document.getElementById('join-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+</script>
+</body>
+</html>
